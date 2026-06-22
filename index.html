@@ -2,17 +2,17 @@
 <html lang="ru">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, -webkit-touch-callout=none">
     <title>База данных</title>
     <script src="https://telegram.org/js/telegram-web-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-app.js"></script>
     <script src="https://www.gstatic.com/firebasejs/8.10.1/firebase-firestore.js"></script>
     <style>
-        * { box-sizing: border-box; margin: 0; padding: 0; }
+        * { box-sizing: border-box; margin: 0; padding: 0; -webkit-tap-highlight-color: transparent; }
         body { 
             background-color: #0f0f0f; color: #ffffff; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-font-smoothing: antialiased;
+            -webkit-font-smoothing: antialiased; user-select: none;
         }
         
         #app { padding: 15px; max-width: 800px; margin: 0 auto; }
@@ -24,7 +24,6 @@
         }
         .chat-item:active { background-color: #2c2c2e; }
         
-        /* Аватарки */
         .avatar {
             width: 46px; height: 46px; border-radius: 50%;
             display: flex; align-items: center; justify-content: center;
@@ -38,9 +37,14 @@
         .chat-meta { font-size: 13px; color: #8e8e93; }
 
         #messages-view { display: none; }
-        .header { display: flex; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #2c2c2e; margin-bottom: 15px; position: sticky; top: 0; background: #0f0f0f; z-index: 10; }
+        .header { 
+            display: flex; align-items: center; padding-bottom: 15px; 
+            border-bottom: 1px solid #2c2c2e; margin-bottom: 15px; 
+            position: sticky; top: 0; background: #0f0f0f; z-index: 10; 
+        }
         .back-btn { background: none; border: none; color: #0a84ff; font-size: 16px; margin-right: 15px; cursor: pointer; font-weight: 500; }
-        .header-title { font-weight: 600; font-size: 18px; }
+        .header-title { font-weight: 600; font-size: 18px; display: flex; align-items: center; }
+        .header-username { font-size: 13px; color: #8e8e93; font-weight: 400; margin-left: 8px; margin-top: 2px; }
 
         .message-list { display: flex; flex-direction: column; gap: 16px; }
         .msg-wrapper { display: flex; align-items: flex-end; gap: 10px; }
@@ -52,23 +56,7 @@
         }
         
         .msg-header { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; gap: 10px; }
-        
-        /* Стили для кликабельного имени и всплывающего юзернейма */
-        .sender-box { position: relative; display: inline-block; cursor: pointer; }
         .msg-sender { font-weight: 600; font-size: 14px; }
-        .user-tooltip {
-            position: absolute; bottom: 140%; left: 50%; transform: translateX(-50%);
-            background: rgba(30, 30, 30, 0.95); color: #fff; padding: 6px 12px;
-            border-radius: 8px; font-size: 12px; white-space: nowrap; font-weight: 500;
-            opacity: 0; visibility: hidden; transition: 0.2s ease-in-out;
-            box-shadow: 0 4px 8px rgba(0,0,0,0.4); z-index: 100;
-        }
-        .user-tooltip::after {
-            content: ''; position: absolute; top: 100%; left: 50%; transform: translateX(-50%);
-            border-width: 5px; border-style: solid; border-color: rgba(30, 30, 30, 0.95) transparent transparent transparent;
-        }
-        .sender-box.active .user-tooltip { opacity: 1; visibility: visible; }
-        
         .msg-time { font-size: 11px; color: #8e8e93; }
         
         .msg-action { font-size: 11px; font-weight: bold; text-transform: uppercase; letter-spacing: 0.5px; margin-right: 5px; }
@@ -78,7 +66,6 @@
         
         .msg-text { font-size: 15px; line-height: 1.4; word-break: break-word; color: #e5e5ea; }
         
-        /* Измененные сообщения (Две колонки) */
         .edit-container { display: flex; gap: 8px; margin-top: 5px; flex-wrap: wrap; }
         .edit-col { flex: 1 1 0; min-width: 120px; background: #2c2c2e; border-radius: 8px; padding: 10px; position: relative; overflow: hidden; }
         .before-col { border-left: 3px solid #ff453a; }
@@ -87,6 +74,27 @@
         .edit-content { font-size: 14px; line-height: 1.4; color: #ffffff; word-break: break-word; }
         
         .loading { text-align: center; color: #8e8e93; margin-top: 50px; font-size: 15px; }
+
+        /* Анимация и стили для модального окна (Зажатие) */
+        #blur-modal {
+            position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.2); z-index: 9999;
+            display: flex; align-items: center; justify-content: center;
+            opacity: 0; visibility: hidden; transition: opacity 0.25s ease;
+        }
+        #blur-modal.active { opacity: 1; visibility: visible; }
+        
+        .blur-modal-content {
+            background: rgba(40, 40, 40, 0.3);
+            backdrop-filter: blur(20px); -webkit-backdrop-filter: blur(20px);
+            padding: 30px 40px; border-radius: 20px;
+            font-size: 18px; font-weight: 500; color: #ffffff;
+            transform: scale(0.8); transition: transform 0.25s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            border: 1px solid rgba(255,255,255,0.05);
+            text-align: center;
+        }
+        #blur-modal.active .blur-modal-content { transform: scale(1); }
     </style>
 </head>
 <body>
@@ -101,9 +109,19 @@
     <div id="messages-view">
         <div class="header">
             <button class="back-btn" onclick="showChatList()">Назад</button>
-            <div id="current-chat-title" class="header-title">Чат</div>
+            <div id="current-chat-title" class="header-title">
+                <span id="header-name"></span>
+                <span id="header-user" class="header-username"></span>
+            </div>
         </div>
         <div id="message-list" class="message-list"></div>
+    </div>
+</div>
+
+<!-- Модальное окно для зажатия -->
+<div id="blur-modal" onclick="closeModal()">
+    <div class="blur-modal-content">
+        <span id="modal-username-text"></span>
     </div>
 </div>
 
@@ -134,17 +152,38 @@
         return avatarColors[Math.abs(hash) % avatarColors.length];
     }
 
-    // Глобальный слушатель кликов, чтобы закрывать всплывающие юзернеймы, если ткнуть в пустоту
-    document.addEventListener('click', () => {
-        document.querySelectorAll('.sender-box').forEach(box => box.classList.remove('active'));
-    });
+    // ЛОГИКА ЗАЖАТИЯ (Long-press)
+    let pressTimer;
+    let isLongPress = false;
 
-    function toggleTooltip(event, el) {
-        event.stopPropagation(); // Останавливаем клик, чтобы не сработал слушатель на document
-        document.querySelectorAll('.sender-box').forEach(box => {
-            if (box !== el) box.classList.remove('active'); // Закрываем другие открытые подсказки
-        });
-        el.classList.toggle('active'); // Открываем/закрываем текущую
+    function startPress(e, username) {
+        if (!username) return; // Если юзернейма нет, ничего не делаем
+        isLongPress = false;
+        pressTimer = setTimeout(() => {
+            isLongPress = true;
+            document.getElementById('modal-username-text').innerText = username;
+            document.getElementById('blur-modal').classList.add('active');
+            
+            // Легкая вибрация, если устройство поддерживает (эффект Телеграма)
+            if (navigator.vibrate) navigator.vibrate(50);
+        }, 500); // 500 мс = долгое зажатие
+    }
+
+    function cancelPress() {
+        clearTimeout(pressTimer);
+    }
+
+    function closeModal() {
+        document.getElementById('blur-modal').classList.remove('active');
+    }
+
+    function clickChat(e, chatId, cleanName, username) {
+        if (isLongPress) {
+            e.preventDefault();
+            isLongPress = false; // Сбрасываем флаг после отпускания
+            return; // Если было зажатие, не переходим в чат
+        }
+        showMessages(chatId, cleanName, username);
     }
 
     window.onload = () => {
@@ -174,7 +213,6 @@
           })
           .catch((error) => {
               document.getElementById('loading-indicator').innerText = 'Ошибка загрузки данных.';
-              console.error("Ошибка:", error);
           });
     }
 
@@ -193,7 +231,15 @@
         });
 
         for (const [chatId, data] of Object.entries(chats)) {
-            const cleanName = data.name.replace(/ \(@.*?\)/, '');
+            // Извлекаем имя и юзернейм
+            let cleanName = data.name;
+            let username = '';
+            if (data.name.includes(' (@')) {
+                const parts = data.name.split(' (@');
+                cleanName = parts[0];
+                username = '@' + parts[1].replace(')', '');
+            }
+
             const firstLetter = cleanName.charAt(0).toUpperCase() || '?';
             const bgColor = getAvatarColor(cleanName);
             
@@ -205,7 +251,16 @@
             
             const item = document.createElement('div');
             item.className = 'chat-item';
-            item.onclick = () => showMessages(chatId, cleanName);
+            
+            // Обработчики зажатия и клика
+            item.onmousedown = (e) => startPress(e, username);
+            item.onmouseup = cancelPress;
+            item.onmouseleave = cancelPress;
+            item.ontouchstart = (e) => startPress(e, username);
+            item.ontouchend = cancelPress;
+            item.ontouchcancel = cancelPress;
+            item.onclick = (e) => clickChat(e, chatId, cleanName, username);
+
             item.innerHTML = `
                 ${avatarHtml}
                 <div class="chat-info">
@@ -216,10 +271,13 @@
         }
     }
 
-    function showMessages(chatId, chatName) {
+    function showMessages(chatId, cleanName, username) {
         document.getElementById('chat-list-view').style.display = 'none';
         document.getElementById('messages-view').style.display = 'block';
-        document.getElementById('current-chat-title').innerText = chatName;
+        
+        // Устанавливаем заголовок чата и серый юзернейм сверху
+        document.getElementById('header-name').innerText = cleanName;
+        document.getElementById('header-user').innerText = username ? username : '';
 
         const msgListEl = document.getElementById('message-list');
         msgListEl.innerHTML = '';
@@ -230,21 +288,14 @@
             const dateStr = formatDate(log.timestamp);
             const senderName = log.sender || "Неизвестный";
             
-            // Отделяем Имя от @username
-            let cleanName = senderName;
-            let usernameTooltipHtml = '';
-            
+            let msgCleanName = senderName;
             if (senderName.includes(' (@')) {
-                const parts = senderName.split(' (@');
-                cleanName = parts[0];
-                const username = '@' + parts[1].replace(')', '');
-                usernameTooltipHtml = `<span class="user-tooltip">${username}</span>`;
+                msgCleanName = senderName.split(' (@')[0];
             }
 
-            const firstLetter = cleanName.charAt(0).toUpperCase() || '?';
-            const bgColor = getAvatarColor(cleanName);
+            const firstLetter = msgCleanName.charAt(0).toUpperCase() || '?';
+            const bgColor = getAvatarColor(msgCleanName);
             
-            // Аватарка внутри чата
             let avatarHtml = `<div class="avatar msg-avatar" style="background-color: ${bgColor}"><span>${firstLetter}</span>`;
             if (log.avatar && log.avatar !== 'none') {
                 avatarHtml += `<img src="${log.avatar}" class="avatar-img" onerror="this.style.display='none'">`;
@@ -258,7 +309,6 @@
 
             let messageContentHtml = '';
 
-            // Две колонки для Измененных сообщений
             if (log.action === 'edited' && log.text && log.text.includes(' | Стало: ')) {
                 const parts = log.text.split(' | Стало: ');
                 const beforeText = parts[0].replace('Было: ', '').trim();
@@ -288,10 +338,7 @@
                     <div class="msg-header">
                         <div>
                             <span class="msg-action ${actionClass}">${actionText}</span>
-                            <div class="sender-box" onclick="toggleTooltip(event, this)">
-                                <span class="msg-sender" style="color: ${bgColor}">${cleanName}</span>
-                                ${usernameTooltipHtml}
-                            </div>
+                            <span class="msg-sender" style="color: ${bgColor}">${msgCleanName}</span>
                         </div>
                         <span class="msg-time">${dateStr}</span>
                     </div>
