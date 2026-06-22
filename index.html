@@ -13,46 +13,18 @@
             background-color: #000000; 
             color: #ffffff; 
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            -webkit-font-smoothing: antialiased;
         }
-        
         #app { padding: 15px; }
-        
-        /* Списки чатов */
         .chat-list { display: flex; flex-direction: column; gap: 10px; }
-        .chat-item {
-            display: flex;
-            align-items: center;
-            padding: 12px;
-            background-color: #121212;
-            border: 1px solid #2a2a2a;
-            border-radius: 10px;
-            cursor: pointer;
-        }
-        .chat-item:active { background-color: #1a1a1a; }
-        .avatar {
-            width: 45px;
-            height: 45px;
-            border-radius: 50%;
-            background-color: #333333;
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-size: 20px;
-            color: #888888;
-            margin-right: 15px;
-            flex-shrink: 0;
-        }
+        .chat-item { display: flex; align-items: center; padding: 12px; background-color: #121212; border: 1px solid #2a2a2a; border-radius: 10px; cursor: pointer; }
+        .avatar { width: 45px; height: 45px; border-radius: 50%; background-color: #333333; display: flex; align-items: center; justify-content: center; font-size: 20px; color: #888888; margin-right: 15px; flex-shrink: 0; }
         .chat-info { flex-grow: 1; overflow: hidden; }
         .chat-name { font-weight: 600; font-size: 16px; margin-bottom: 4px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .chat-meta { font-size: 13px; color: #888888; }
-
-        /* Внутри чата (сообщения) */
         #messages-view { display: none; }
         .header { display: flex; align-items: center; padding-bottom: 15px; border-bottom: 1px solid #2a2a2a; margin-bottom: 15px; }
         .back-btn { background: none; border: none; color: #ffffff; font-size: 16px; margin-right: 15px; cursor: pointer; padding: 5px; }
         .header-title { font-weight: bold; font-size: 18px; }
-
         .message-list { display: flex; flex-direction: column; gap: 12px; }
         .message-item { background-color: #121212; border: 1px solid #2a2a2a; border-radius: 8px; padding: 12px; }
         .msg-header { display: flex; justify-content: space-between; margin-bottom: 8px; font-size: 12px; color: #888888; }
@@ -61,7 +33,6 @@
         .action-edited { color: #999999; }
         .action-media { color: #aaaaaa; }
         .msg-text { font-size: 15px; line-height: 1.4; word-break: break-word; }
-        
         .loading { text-align: center; color: #666; margin-top: 50px; }
     </style>
 </head>
@@ -69,9 +40,7 @@
 
 <div id="app">
     <div id="chat-list-view">
-        <div class="header">
-            <div class="header-title">Логи чатов</div>
-        </div>
+        <div class="header"><div class="header-title">Логи чатов</div></div>
         <div id="loading-indicator" class="loading">Загрузка данных...</div>
         <div id="chat-list" class="chat-list"></div>
     </div>
@@ -86,7 +55,6 @@
 </div>
 
 <script>
-    // ТВОЙ НОВЫЙ КОНФИГ FIREBASE
     const firebaseConfig = {
         apiKey: "AIzaSyDj5Ure84vcQ4K_ElWE8s4szAfwGsTCOXw",
         authDomain: "dialofspy.firebaseapp.com",
@@ -97,35 +65,40 @@
         measurementId: "G-EKYFKLYLNR"
     };
 
-    // Инициализация
     firebase.initializeApp(firebaseConfig);
     const db = firebase.firestore();
     const tg = window.Telegram.WebApp;
-    
     tg.expand();
     
-    // Получаем ID пользователя из Телеграма
     const userId = tg.initDataUnsafe?.user?.id ? String(tg.initDataUnsafe.user.id) : null;
     let allLogs = [];
 
     window.onload = () => {
         if (!userId) {
-            document.getElementById('app').innerHTML = '<div class="loading">Доступ запрещен. Откройте приложение через бота.</div>';
+            document.getElementById('app').innerHTML = '<div class="loading">Доступ запрещен. Откройте через бота.</div>';
             return;
         }
         loadData();
     };
 
     function loadData() {
+        // Убрали orderBy, который ломал загрузку
         db.collection('spy_logs')
           .where('owner_id', '==', userId)
-          .orderBy('timestamp', 'desc')
           .get()
           .then((querySnapshot) => {
               allLogs = [];
               querySnapshot.forEach((doc) => {
                   allLogs.push({ id: doc.id, ...doc.data() });
               });
+              
+              // Сортируем новые сообщения наверх с помощью JavaScript
+              allLogs.sort((a, b) => {
+                  const timeA = a.timestamp ? a.timestamp.toMillis() : 0;
+                  const timeB = b.timestamp ? b.timestamp.toMillis() : 0;
+                  return timeB - timeA;
+              });
+
               document.getElementById('loading-indicator').style.display = 'none';
               renderChatList();
           })
@@ -138,20 +111,12 @@
     function renderChatList() {
         const chatListEl = document.getElementById('chat-list');
         chatListEl.innerHTML = '';
-        
-        if (allLogs.length === 0) {
-            chatListEl.innerHTML = '<div class="loading">Логов пока нет.</div>';
-            return;
-        }
+        if (allLogs.length === 0) { chatListEl.innerHTML = '<div class="loading">Логов пока нет.</div>'; return; }
 
         const chats = {};
         allLogs.forEach(log => {
             if (!chats[log.chat_id]) {
-                chats[log.chat_id] = {
-                    name: log.sender,
-                    count: 0,
-                    lastLog: log
-                };
+                chats[log.chat_id] = { name: log.sender, count: 0, lastLog: log };
             }
             chats[log.chat_id].count++;
         });
@@ -166,8 +131,7 @@
                 <div class="chat-info">
                     <div class="chat-name">${data.name}</div>
                     <div class="chat-meta">Сохранено логов: ${data.count}</div>
-                </div>
-            `;
+                </div>`;
             chatListEl.appendChild(item);
         }
     }
@@ -180,13 +144,9 @@
         const msgListEl = document.getElementById('message-list');
         msgListEl.innerHTML = '';
 
-        const chatLogs = allLogs.filter(log => log.chat_id === chatId);
-
-        chatLogs.forEach(log => {
+        allLogs.filter(log => log.chat_id === chatId).forEach(log => {
             const dateStr = formatDate(log.timestamp);
-            let actionText = '';
-            let actionClass = '';
-
+            let actionText = '', actionClass = '';
             if (log.action === 'deleted') { actionText = 'Удалено'; actionClass = 'action-deleted'; }
             else if (log.action === 'edited') { actionText = 'Изменено'; actionClass = 'action-edited'; }
             else if (log.action === 'media') { actionText = 'Медиа'; actionClass = 'action-media'; }
@@ -198,8 +158,7 @@
                     <span class="msg-action ${actionClass}">${actionText}</span>
                     <span>${dateStr}</span>
                 </div>
-                <div class="msg-text">${log.text}</div>
-            `;
+                <div class="msg-text">${log.text}</div>`;
             msgListEl.appendChild(msgEl);
         });
     }
@@ -212,16 +171,7 @@
     function formatDate(firebaseTimestamp) {
         if (!firebaseTimestamp) return 'Время неизвестно';
         const date = firebaseTimestamp.toDate();
-        const now = new Date();
-        
-        const timeOpts = { hour: '2-digit', minute: '2-digit' };
-        const dateOpts = { day: 'numeric', month: 'short' };
-        
-        if (date.getFullYear() < now.getFullYear()) {
-            dateOpts.year = 'numeric';
-        }
-        
-        return `${date.toLocaleDateString('ru-RU', dateOpts)} ${date.toLocaleTimeString('ru-RU', timeOpts)}`;
+        return `${date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' })} ${date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' })}`;
     }
 </script>
 </body>
